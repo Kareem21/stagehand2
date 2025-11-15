@@ -1,0 +1,25 @@
+# Environment variables
+.env
+
+# Dependencies
+node_modules/
+
+# Results (contains application history)
+results/
+
+# User data (contains personal information)
+data/user-data.json
+data/resume.pdf
+data/cover-letter.pdf
+
+# Keep example files
+!data/.gitkeep
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db

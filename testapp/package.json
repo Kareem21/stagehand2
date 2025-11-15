@@ -1,0 +1,18 @@
+{
+  "name": "job-auto-apply-mvp",
+  "version": "1.0.0",
+  "description": "MVP for automated job applications using Stagehand",
+  "type": "module",
+  "scripts": {
+    "apply": "node --import tsx apply-all.ts",
+    "test": "node --import tsx apply-all.ts --dry-run"
+  },
+  "keywords": ["automation", "job-application", "stagehand"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@browserbasehq/stagehand": "^3.0.2",
+    "dotenv": "^16.4.5",
+    "tsx": "^4.10.5"
+  }
+}

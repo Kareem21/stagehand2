@@ -1,0 +1,22 @@
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john.doe@example.com",
+  "phone": "+1234567890",
+  "linkedinUrl": "https://linkedin.com/in/johndoe",
+  "portfolioUrl": "https://johndoe.com",
+  "currentCompany": "Tech Corp",
+  "currentTitle": "Senior Software Engineer",
+  "yearsExperience": 5,
+  "education": {
+    "degree": "Bachelor's in Computer Science",
+    "university": "State University",
+    "graduationYear": 2019
+  },
+  "location": {
+    "city": "San Francisco",
+    "country": "United States"
+  },
+  "resumePath": "./data/resume.pdf",
+  "coverLetterPath": "./data/cover-letter.pdf"
+}
