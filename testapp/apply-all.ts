@@ -52,6 +52,11 @@ async function loadUserData(): Promise<UserData> {
   return data;
 }
 
+async function loadUserResume(): Promise<string> {
+  const resumePath = join(process.cwd(), "data", "resume.md");
+  return readFileSync(resumePath, "utf-8");
+}
+
 async function loadJobUrls(): Promise<string[]> {
   const jobsPath = join(process.cwd(), "data", "jobs.json");
   const urls = JSON.parse(readFileSync(jobsPath, "utf-8"));
@@ -86,6 +91,7 @@ async function applyToJob(
   stagehand: Stagehand,
   jobUrl: string,
   userData: UserData,
+  resumeMarkdown: string,
   jobIndex: number
 ): Promise<JobResult> {
   const startTime = Date.now();
@@ -114,12 +120,12 @@ async function applyToJob(
     const agent = stagehand.agent();
 
     const instruction = `
-Fill out this job application form using the following candidate data:
+Fill out this job application form using the following candidate resume/profile:
 
-${JSON.stringify(userData, null, 2)}
+${resumeMarkdown}
 
 INSTRUCTIONS:
-- Fill ALL form fields with the data provided above
+- Fill ALL form fields with data from the resume above
 - For missing data, use reasonable defaults:
   • Work authorization questions → "Yes"
   • Salary expectations → "Negotiable"
@@ -168,12 +174,14 @@ async function main() {
   }
 
   // Load data
-  console.log("📂 Loading user data and job URLs...");
+  console.log("📂 Loading resume and job URLs...");
   const userData = await loadUserData();
+  const resumeMarkdown = await loadUserResume();
   const jobUrls = await loadJobUrls();
   const completedJobs = getCompletedJobs();
 
   console.log(`   ✓ User: ${userData.firstName} ${userData.lastName}`);
+  console.log(`   ✓ Resume loaded: ${resumeMarkdown.length} characters`);
   console.log(`   ✓ Jobs to process: ${jobUrls.length}`);
   console.log(`   ✓ Already completed: ${completedJobs.size}`);
   console.log(`   ✓ Remaining: ${jobUrls.length - completedJobs.size}\n`);
@@ -209,7 +217,7 @@ async function main() {
       continue;
     }
 
-    const result = await applyToJob(stagehand, jobUrl, userData, i);
+    const result = await applyToJob(stagehand, jobUrl, userData, resumeMarkdown, i);
     saveResult(result);
     results.push(result);
 
