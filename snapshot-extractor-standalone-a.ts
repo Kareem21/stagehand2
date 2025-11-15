@@ -20,6 +20,13 @@ import { join } from "path";
 async function extractSnapshot(url: string) {
   console.log(`🚀 Extracting snapshot from: ${url}\n`);
 
+  // Check for API key (needed for LLM extraction)
+  if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+    console.warn("⚠️  Warning: No OPENAI_API_KEY or ANTHROPIC_API_KEY found.");
+    console.warn("   Set one of these environment variables to use extract().");
+    console.warn("   Example: export OPENAI_API_KEY=your-key-here\n");
+  }
+
   const stagehand = new Stagehand({
     env: "LOCAL",
     verbose: 1,
@@ -31,11 +38,19 @@ async function extractSnapshot(url: string) {
     console.log("🌐 Launching browser...");
     await stagehand.init();
 
-    const page = stagehand.page;
+    // Get the page from context
+    const page = stagehand.context.pages()[0];
+
+    if (!page) {
+      throw new Error("No page found. Browser may not have initialized correctly.");
+    }
 
     console.log("📄 Navigating to URL...");
     await page.goto(url, { waitUntil: "networkidle" });
-    await page.waitForTimeout(2000);
+
+    // Wait for dynamic content
+    console.log("⏳ Waiting for page to settle...");
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     console.log("📸 Capturing page data...");
 
@@ -53,8 +68,9 @@ async function extractSnapshot(url: string) {
       }),
     });
 
-    // Also get the raw HTML for reference
-    const htmlContent = await page.content();
+    // Get the raw HTML for reference
+    console.log("📄 Getting page HTML...");
+    const htmlContent = await page.evaluate(() => document.documentElement.outerHTML);
 
     // Create output directory
     const outputDir = join(process.cwd(), "snapshot-output");
