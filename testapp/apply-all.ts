@@ -114,49 +114,24 @@ async function applyToJob(
     const agent = stagehand.agent();
 
     const instruction = `
-You are filling out a job application form. Use the following data to complete the form:
+Fill out this job application form using the following candidate data:
 
-Personal Information:
-- First Name: ${userData.firstName}
-- Last Name: ${userData.lastName}
-- Email: ${userData.email}
-- Phone: ${userData.phone}
-${userData.location ? `- City: ${userData.location.city}` : ""}
-${userData.location ? `- Country: ${userData.location.country}` : ""}
+${JSON.stringify(userData, null, 2)}
 
-Professional Information:
-${userData.currentCompany ? `- Current Company: ${userData.currentCompany}` : ""}
-${userData.currentTitle ? `- Current Job Title: ${userData.currentTitle}` : ""}
-${userData.yearsExperience ? `- Years of Experience: ${userData.yearsExperience}` : ""}
-${userData.linkedinUrl ? `- LinkedIn: ${userData.linkedinUrl}` : ""}
-${userData.portfolioUrl ? `- Portfolio: ${userData.portfolioUrl}` : ""}
+INSTRUCTIONS:
+- Fill ALL form fields with the data provided above
+- For missing data, use reasonable defaults:
+  • Work authorization questions → "Yes"
+  • Salary expectations → "Negotiable"
+  • Notice period → "30 days"
+  • Skills/experience YES/NO questions → "Yes" if reasonable
+  • Diversity/demographics → "Prefer not to say" (or skip)
+- Skip file upload fields (resume/cover letter)
+- Navigate multi-page forms by clicking "Next"/"Continue"
+- Click final "Submit Application" button
+- STOP at CAPTCHA or authentication
 
-Education:
-${userData.education ? `- Degree: ${userData.education.degree}` : ""}
-${userData.education ? `- University: ${userData.education.university}` : ""}
-${userData.education ? `- Graduation Year: ${userData.education.graduationYear}` : ""}
-
-IMPORTANT INSTRUCTIONS:
-1. Fill out ALL form fields with the data provided above
-2. For any fields where data is NOT provided, use reasonable defaults:
-   - For "Are you authorized to work in [country]?" → Answer YES
-   - For "Years of experience in [skill]?" → Use ${userData.yearsExperience || 3} years
-   - For "Current salary?" → Skip or use "Negotiable"
-   - For "Expected salary?" → Skip or use "Negotiable"
-   - For "Notice period?" → Use "30 days" or "Immediate"
-   - For location questions (city/country) → Use ${userData.location?.city || "Not specified"}, ${userData.location?.country || "Not specified"}
-   - For any YES/NO questions about skills or experience → Answer YES if it seems reasonable
-   - For education level → Use "${userData.education?.degree || "Bachelor's Degree"}"
-   - For diversity/demographics questions → Select "Prefer not to say" if available, otherwise skip
-3. If you encounter file upload fields:
-   - Resume upload: Note it but skip (we'll handle separately)
-   - Cover letter: Skip
-4. Navigate through multi-page forms by clicking "Next" or "Continue" buttons
-5. Review the form before submitting
-6. Click the final "Submit Application" or "Apply" button
-7. If you encounter CAPTCHA or authentication, STOP and report it
-
-Complete the application form now.
+Complete the form now.
 `;
 
     const agentResult = await agent.execute(instruction, {
