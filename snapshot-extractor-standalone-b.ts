@@ -13,8 +13,8 @@
  */
 
 import { chromium } from "playwright";
-import fs from "fs";
-import path from "path";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { join, basename } from "path";
 
 interface AccessibilityNode {
   role?: string;
@@ -71,9 +71,9 @@ async function extractSnapshot(url: string) {
     const htmlContent = await page.content();
 
     // Create output directory
-    const outputDir = path.join(process.cwd(), "snapshot-output");
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
+    const outputDir = join(process.cwd(), "snapshot-output");
+    if (!existsSync(outputDir)) {
+      mkdirSync(outputDir, { recursive: true });
     }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -83,24 +83,24 @@ async function extractSnapshot(url: string) {
     console.log("\n💾 Saving outputs...");
 
     // 1. Accessibility tree (text format)
-    const treePath = path.join(outputDir, `${prefix}_accessibility-tree.txt`);
-    fs.writeFileSync(treePath, treeText, "utf-8");
-    console.log(`   ✅ Accessibility tree: ${path.basename(treePath)}`);
+    const treePath = join(outputDir, `${prefix}_accessibility-tree.txt`);
+    writeFileSync(treePath, treeText, "utf-8");
+    console.log(`   ✅ Accessibility tree: ${basename(treePath)}`);
 
     // 2. Raw accessibility nodes (JSON)
-    const nodesPath = path.join(outputDir, `${prefix}_accessibility-nodes.json`);
-    fs.writeFileSync(nodesPath, JSON.stringify(nodes, null, 2), "utf-8");
-    console.log(`   ✅ Raw nodes: ${path.basename(nodesPath)}`);
+    const nodesPath = join(outputDir, `${prefix}_accessibility-nodes.json`);
+    writeFileSync(nodesPath, JSON.stringify(nodes, null, 2), "utf-8");
+    console.log(`   ✅ Raw nodes: ${basename(nodesPath)}`);
 
     // 3. Element analysis
-    const analysisPath = path.join(outputDir, `${prefix}_element-analysis.json`);
-    fs.writeFileSync(analysisPath, JSON.stringify(analysis, null, 2), "utf-8");
-    console.log(`   ✅ Analysis: ${path.basename(analysisPath)}`);
+    const analysisPath = join(outputDir, `${prefix}_element-analysis.json`);
+    writeFileSync(analysisPath, JSON.stringify(analysis, null, 2), "utf-8");
+    console.log(`   ✅ Analysis: ${basename(analysisPath)}`);
 
     // 4. HTML content
-    const htmlPath = path.join(outputDir, `${prefix}_page.html`);
-    fs.writeFileSync(htmlPath, htmlContent, "utf-8");
-    console.log(`   ✅ HTML: ${path.basename(htmlPath)}`);
+    const htmlPath = join(outputDir, `${prefix}_page.html`);
+    writeFileSync(htmlPath, htmlContent, "utf-8");
+    console.log(`   ✅ HTML: ${basename(htmlPath)}`);
 
     // 5. Summary
     const summary = {
@@ -121,16 +121,16 @@ async function extractSnapshot(url: string) {
         htmlSize: htmlContent.length,
       },
       files: {
-        tree: path.basename(treePath),
-        nodes: path.basename(nodesPath),
-        analysis: path.basename(analysisPath),
-        html: path.basename(htmlPath),
+        tree: basename(treePath),
+        nodes: basename(nodesPath),
+        analysis: basename(analysisPath),
+        html: basename(htmlPath),
       },
     };
 
-    const summaryPath = path.join(outputDir, `${prefix}_summary.json`);
-    fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2), "utf-8");
-    console.log(`   ✅ Summary: ${path.basename(summaryPath)}`);
+    const summaryPath = join(outputDir, `${prefix}_summary.json`);
+    writeFileSync(summaryPath, JSON.stringify(summary, null, 2), "utf-8");
+    console.log(`   ✅ Summary: ${basename(summaryPath)}`);
 
     console.log("\n📊 Statistics:");
     console.log(`   ⏱️  Total time: ${summary.timings.totalMs}ms`);

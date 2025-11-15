@@ -14,8 +14,8 @@
 
 import { Stagehand } from "@browserbasehq/stagehand";
 import { z } from "zod";
-import fs from "fs";
-import path from "path";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { join } from "path";
 
 async function extractSnapshot(url: string) {
   console.log(`🚀 Extracting snapshot from: ${url}\n`);
@@ -57,9 +57,9 @@ async function extractSnapshot(url: string) {
     const htmlContent = await page.content();
 
     // Create output directory
-    const outputDir = path.join(process.cwd(), "snapshot-output");
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
+    const outputDir = join(process.cwd(), "snapshot-output");
+    if (!existsSync(outputDir)) {
+      mkdirSync(outputDir, { recursive: true });
     }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -69,13 +69,13 @@ async function extractSnapshot(url: string) {
     console.log("\n💾 Saving outputs...");
 
     // 1. Extracted data (structured)
-    const extractPath = path.join(outputDir, `${prefix}_extracted-data.json`);
-    fs.writeFileSync(extractPath, JSON.stringify(pageData, null, 2), "utf-8");
+    const extractPath = join(outputDir, `${prefix}_extracted-data.json`);
+    writeFileSync(extractPath, JSON.stringify(pageData, null, 2), "utf-8");
     console.log(`✅ Extracted data: ${extractPath}`);
 
     // 2. Raw HTML
-    const htmlPath = path.join(outputDir, `${prefix}_page.html`);
-    fs.writeFileSync(htmlPath, htmlContent, "utf-8");
+    const htmlPath = join(outputDir, `${prefix}_page.html`);
+    writeFileSync(htmlPath, htmlContent, "utf-8");
     console.log(`✅ HTML content: ${htmlPath}`);
 
     // 3. Summary
@@ -91,8 +91,8 @@ async function extractSnapshot(url: string) {
       data: pageData,
     };
 
-    const summaryPath = path.join(outputDir, `${prefix}_summary.json`);
-    fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2), "utf-8");
+    const summaryPath = join(outputDir, `${prefix}_summary.json`);
+    writeFileSync(summaryPath, JSON.stringify(summary, null, 2), "utf-8");
     console.log(`✅ Summary: ${summaryPath}`);
 
     console.log("\n📊 Stats:");
