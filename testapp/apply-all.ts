@@ -116,41 +116,60 @@ async function applyToJob(
 
     console.log("🤖 Starting AI agent to fill application...");
 
-    // Use agent to fill the entire form
-    const agent = stagehand.agent();
+    // Use agent to fill the entire form with Sonnet for better planning
+    const agent = stagehand.agent({
+      model: "anthropic/claude-sonnet-4-20250514" // Force Sonnet for intelligent planning
+    });
 
     const instruction = `
-Fill out this job application form using the following candidate resume/profile:
+You are filling out a job application form. Work EFFICIENTLY - minimize observation, maximize action.
 
+CANDIDATE DATA:
 ${resumeMarkdown}
 
-INSTRUCTIONS:
-- Fill ALL form fields with data from the resume above
-- For missing data, use reasonable defaults:
-  • Work authorization questions → "Yes"
-  • Salary expectations → "Negotiable"
-  • Notice period → "30 days"
-  • Skills/experience YES/NO questions → "Yes" if reasonable
-  • Diversity/demographics → "Prefer not to say" (or skip)
-- Skip file upload fields (resume/cover letter)
-- Navigate multi-page forms by clicking "Next"/"Continue"
-- Click final "Submit Application" button
-- STOP at CAPTCHA or authentication
+STRATEGY:
+1. Scan the page ONCE to identify all visible form fields
+2. Fill each field immediately - do NOT screenshot between every field
+3. Only take additional observations if:
+   - A field fails to fill
+   - You encounter a dropdown/multi-step element
+   - You need to navigate to next page
+4. For missing data, use these defaults:
+   - Work authorization: "Yes"
+   - Salary: "Negotiable"
+   - Notice period: "30 days"
+   - Yes/No skills questions: "Yes" (if reasonable)
+   - Demographics: "Prefer not to say"
 
-Complete the form now.
+EXECUTE NOW:
+- Fill ALL visible fields efficiently
+- Click "Next"/"Continue" for multi-page forms
+- Click "Submit" when form is complete
+- Skip file uploads
+- Stop at CAPTCHA/authentication
 `;
 
     const agentResult = await agent.execute(instruction, {
-      maxSteps: 50, // Allow up to 50 actions
+      maxSteps: 150, // Allow sufficient steps for complex forms
     });
 
     result.actionsPerformed = agentResult.actions?.map(a => a.type) || [];
     result.status = "success";
     result.duration = Date.now() - startTime;
 
-    console.log(`\n✅ Application completed successfully!`);
+    // Count action types
+    const fillActions = result.actionsPerformed.filter(a => a === 'fill').length;
+    const clickActions = result.actionsPerformed.filter(a => a === 'click').length;
+    const screenshotActions = result.actionsPerformed.filter(a => a === 'screenshot').length;
+    const observeActions = result.actionsPerformed.filter(a => a === 'observe' || a === 'ariaTree').length;
+
+    console.log(`\n✅ Application completed!`);
     console.log(`   Duration: ${Math.round(result.duration / 1000)}s`);
-    console.log(`   Actions: ${result.actionsPerformed.length}`);
+    console.log(`   Total actions: ${result.actionsPerformed.length}`);
+    console.log(`   └─ Fields filled: ${fillActions}`);
+    console.log(`   └─ Clicks: ${clickActions}`);
+    console.log(`   └─ Screenshots: ${screenshotActions}`);
+    console.log(`   └─ Observations: ${observeActions}`);
 
   } catch (error: any) {
     result.status = "failed";
