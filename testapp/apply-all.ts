@@ -39,11 +39,23 @@ interface UserData {
 interface JobResult {
   jobIndex: number;
   url: string;
+  domain: string;
   status: "success" | "failed" | "skipped";
   timestamp: string;
   duration?: number;
   error?: string;
   actionsPerformed?: string[];
+  validated?: boolean;
+  cacheHit?: boolean;
+}
+
+function extractDomain(url: string): string {
+  try {
+    const domain = new URL(url).hostname.replace('www.', '');
+    return domain;
+  } catch {
+    return 'unknown';
+  }
 }
 
 async function loadUserData(): Promise<UserData> {
@@ -88,26 +100,40 @@ function saveResult(result: JobResult) {
 }
 
 async function applyToJob(
-  stagehand: Stagehand,
   jobUrl: string,
   userData: UserData,
   resumeMarkdown: string,
   jobIndex: number
 ): Promise<JobResult> {
   const startTime = Date.now();
+  const domain = extractDomain(jobUrl);
   const result: JobResult = {
     jobIndex,
     url: jobUrl,
+    domain,
     status: "failed",
     timestamp: new Date().toISOString(),
     actionsPerformed: [],
   };
 
+  const stagehand = new Stagehand({
+    env: "LOCAL",
+    verbose: 2,
+    headless: false,
+    cacheDir: `./cache/${domain}`,
+    model: {
+      modelName: "anthropic/claude-haiku-4-5-20251001",
+      apiKey: process.env.ANTHROPIC_API_KEY || ''
+    }
+  });
+
   try {
     console.log(`\n${"=".repeat(80)}`);
     console.log(`🎯 Job ${jobIndex + 1}: ${jobUrl}`);
+    console.log(`📦 Domain: ${domain} | Cache: ./cache/${domain}`);
     console.log("=".repeat(80));
 
+    await stagehand.init();
     const page = stagehand.context.pages()[0];
 
     console.log("📄 Navigating to job application...");
@@ -116,48 +142,89 @@ async function applyToJob(
 
     console.log("🤖 Starting AI agent to fill application...");
 
-    // Use agent to fill the entire form with Sonnet for better planning
     const agent = stagehand.agent({
-      model: "anthropic/claude-sonnet-4-20250514" // Force Sonnet for intelligent planning
+      model: {
+        modelName: "anthropic/claude-haiku-4-5-20251001",
+        apiKey: process.env.ANTHROPIC_API_KEY || ''
+      }
     });
 
     const instruction = `
-You are filling out a job application form. Work EFFICIENTLY - minimize observation, maximize action.
+Fill this job application using the candidate information below:
 
-CANDIDATE DATA:
 ${resumeMarkdown}
 
-STRATEGY:
-1. Scan the page ONCE to identify all visible form fields
-2. Fill each field immediately - do NOT screenshot between every field
-3. Only take additional observations if:
-   - A field fails to fill
-   - You encounter a dropdown/multi-step element
-   - You need to navigate to next page
-4. For missing data, use these defaults:
-   - Work authorization: "Yes"
-   - Salary: "Negotiable"
-   - Notice period: "30 days"
-   - Yes/No skills questions: "Yes" (if reasonable)
-   - Demographics: "Prefer not to say"
+INSTRUCTIONS:
+- Fill ALL form fields with data from the resume above
+- For ANY question not covered in the resume, make up a reasonable answer
+- NEVER leave fields empty
+- Examples of reasonable defaults:
+  • Work authorization: "Yes"
+  • Salary expectations: "Negotiable" or "Market rate"
+  • Notice period: "30 days" or "Immediately"
+  • Years of experience with specific tech: Estimate based on resume context
+  • Diversity/demographics: "Prefer not to say"
 
-EXECUTE NOW:
-- Fill ALL visible fields efficiently
-- Click "Next"/"Continue" for multi-page forms
-- Click "Submit" when form is complete
-- Skip file uploads
-- Stop at CAPTCHA/authentication
+WORKFLOW:
+1. Identify all visible form fields
+2. Fill each field immediately (no screenshots between fields)
+3. Click "Next"/"Continue" for multi-page forms
+4. Click "Submit" when complete
+5. Skip file uploads
+
+SUCCESS CRITERIA:
+Stop when you see "Application Submitted", "Thank you", or confirmation message.
+
+Execute now.
 `;
 
     const agentResult = await agent.execute(instruction, {
-      maxSteps: 150, // Allow sufficient steps for complex forms
+      maxSteps: 150,
     });
 
+    const history = await stagehand.history;
+
+    const recipe = history
+        .filter(entry => entry.method === 'act')
+        .map(entry => {
+          const actResult = entry.result as any;
+          if (actResult?.actions && Array.isArray(actResult.actions)) {
+            return actResult.actions.map((action: any) => ({
+              action: action.method || 'unknown',
+              xpath: action.selector || '',
+              arguments: action.arguments || []
+            }));
+          }
+          return [];
+        })
+        .flat();
+
+    const recipeFilename = `job-${jobIndex}-recipe.json`;
+    const recipeFilepath = join(process.cwd(), "results", recipeFilename);
+    writeFileSync(recipeFilepath, JSON.stringify(recipe, null, 2), "utf-8");
+
     result.actionsPerformed = agentResult.actions?.map(a => a.type) || [];
-    result.status = "success";
     result.duration = Date.now() - startTime;
 
-    // Count action types
+    console.log("🔍 Validating submission...");
+    const pageUrl = page.url();
+    const pageContent = await page.content();
+
+    const successIndicators = [
+      pageUrl.includes('success'),
+      pageUrl.includes('confirmation'),
+      pageUrl.includes('thank'),
+      pageContent.toLowerCase().includes('application submitted'),
+      pageContent.toLowerCase().includes('thank you for applying'),
+      pageContent.toLowerCase().includes('application received')
+    ];
+
+    result.validated = successIndicators.some(indicator => indicator);
+    result.status = "success";
+
+    console.log("⏱️ Waiting 5 seconds...");
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
     const fillActions = result.actionsPerformed.filter(a => a === 'fill').length;
     const clickActions = result.actionsPerformed.filter(a => a === 'click').length;
     const screenshotActions = result.actionsPerformed.filter(a => a === 'screenshot').length;
@@ -170,6 +237,7 @@ EXECUTE NOW:
     console.log(`   └─ Clicks: ${clickActions}`);
     console.log(`   └─ Screenshots: ${screenshotActions}`);
     console.log(`   └─ Observations: ${observeActions}`);
+    console.log(`   └─ Validated: ${result.validated ? '✅ Yes' : '⚠️ No'}`);
 
   } catch (error: any) {
     result.status = "failed";
@@ -177,6 +245,8 @@ EXECUTE NOW:
     result.duration = Date.now() - startTime;
 
     console.error(`\n❌ Application failed: ${error.message}`);
+  } finally {
+    await stagehand.close();
   }
 
   return result;
@@ -185,14 +255,12 @@ EXECUTE NOW:
 async function main() {
   console.log("🚀 Job Auto-Apply MVP Starting...\n");
 
-  // Check for API key
   if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY) {
     console.error("❌ Error: No API key found!");
     console.error("Set ANTHROPIC_API_KEY or OPENAI_API_KEY in .env file");
     process.exit(1);
   }
 
-  // Load data
   console.log("📂 Loading resume and job URLs...");
   const userData = await loadUserData();
   const resumeMarkdown = await loadUserResume();
@@ -205,22 +273,6 @@ async function main() {
   console.log(`   ✓ Already completed: ${completedJobs.size}`);
   console.log(`   ✓ Remaining: ${jobUrls.length - completedJobs.size}\n`);
 
-  // Initialize Stagehand
-  console.log("🌐 Initializing Stagehand...");
-  const stagehand = new Stagehand({
-    env: "LOCAL",
-    verbose: 2, // Maximum logging
-    headless: false, // Watch it work!
-    enableCaching: true, // Enable caching for speed
-    model: process.env.ANTHROPIC_API_KEY
-      ? "anthropic/claude-sonnet-4-20250514"
-      : "openai/gpt-4o-mini",
-  });
-
-  await stagehand.init();
-  console.log("   ✓ Browser ready\n");
-
-  // Process jobs
   const results: JobResult[] = [];
   let successCount = 0;
   let failCount = 0;
@@ -229,14 +281,13 @@ async function main() {
   for (let i = 0; i < jobUrls.length; i++) {
     const jobUrl = jobUrls[i];
 
-    // Skip if already completed
     if (completedJobs.has(i)) {
       console.log(`⏭️  Skipping job ${i + 1} (already completed)`);
       skipCount++;
       continue;
     }
 
-    const result = await applyToJob(stagehand, jobUrl, userData, resumeMarkdown, i);
+    const result = await applyToJob(jobUrl, userData, resumeMarkdown, i);
     saveResult(result);
     results.push(result);
 
@@ -246,14 +297,12 @@ async function main() {
       failCount++;
     }
 
-    // Small delay between applications
     if (i < jobUrls.length - 1) {
       console.log("\n⏳ Waiting 5 seconds before next application...");
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
 
-  // Summary
   console.log("\n" + "=".repeat(80));
   console.log("📊 APPLICATION SUMMARY");
   console.log("=".repeat(80));
@@ -262,8 +311,6 @@ async function main() {
   console.log(`❌ Failed: ${failCount}`);
   console.log(`⏭️  Skipped: ${skipCount}`);
   console.log(`\n📁 Results saved to: ${join(process.cwd(), "results")}`);
-
-  await stagehand.close();
   console.log("\n✨ Done!");
 }
 
