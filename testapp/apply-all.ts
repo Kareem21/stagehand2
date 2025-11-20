@@ -65,7 +65,7 @@ async function loadUserData(): Promise<UserData> {
 }
 
 async function loadUserResume(): Promise<string> {
-  const resumePath = join(process.cwd(), "data", "resume.md");
+  const resumePath = join(process.cwd(), "resumemd.md");
   return readFileSync(resumePath, "utf-8");
 }
 
@@ -213,15 +213,15 @@ Execute now.
 
     console.log("🔍 Validating submission...");
     const pageUrl = page.url();
-    const pageContent = await page.content();
+    const pageContent = await page.evaluate(() => document.body.innerText.toLowerCase());
 
     const successIndicators = [
       pageUrl.includes('success'),
       pageUrl.includes('confirmation'),
       pageUrl.includes('thank'),
-      pageContent.toLowerCase().includes('application submitted'),
-      pageContent.toLowerCase().includes('thank you for applying'),
-      pageContent.toLowerCase().includes('application received')
+      pageContent.includes('application submitted'),
+      pageContent.includes('thank you for applying'),
+      pageContent.includes('application received')
     ];
 
     result.validated = successIndicators.some(indicator => indicator);
