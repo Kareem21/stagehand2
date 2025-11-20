@@ -140,6 +140,11 @@ async function applyToJob(
     await page.goto(jobUrl, { waitUntil: "networkidle", timeout: 60000 });
     await new Promise(resolve => setTimeout(resolve, 3000));
 
+    console.log("⚡ Optimizing DOM for faster processing...");
+    await page.evaluate(() => {
+      document.querySelectorAll('video, iframe, [style*="animation"]').forEach(el => el.remove());
+    });
+
     console.log("🤖 Starting AI agent to fill application...");
 
     const agent = stagehand.agent({
